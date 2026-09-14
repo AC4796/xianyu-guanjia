@@ -1,0 +1,82 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --app-bg: #f5f7f9;
+  --app-bg-elevated: #ffffff;
+  --app-text: #1f2225;
+  --app-text-secondary: #8a9099;
+  --app-border: #efeff5;
+  --msg-in-bg: #f2f3f5;
+  --msg-out-bg: #d9f5e5;
+}
+
+html.dark {
+  --app-bg: #101014;
+  --app-bg-elevated: #18181c;
+  --app-text: #e5e5e5;
+  --app-text-secondary: #a0a0a8;
+  --app-border: #2a2a30;
+  --msg-in-bg: #2a2a32;
+  --msg-out-bg: #1a3d2e;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  background: var(--app-bg);
+  color: var(--app-text);
+  user-select: none;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 让布局容器跟随主题，避免内容区留白 */
+.n-layout,
+.n-layout-scroll-container,
+.n-layout-sider,
+.n-layout-header,
+.n-layout-footer,
+.n-layout-content {
+  background-color: transparent !important;
+}
+
+html.dark .n-card {
+  background-color: var(--app-bg-elevated);
+}
+
+html.dark .n-data-table .n-data-table-th,
+html.dark .n-data-table .n-data-table-td {
+  background-color: var(--app-bg-elevated);
+}
+
+html.dark .n-tabs .n-tabs-nav {
+  background-color: transparent;
+}
+
+html.dark .n-list,
+html.dark .n-empty {
+  --n-text-color: var(--app-text-secondary);
+}
+
+html.dark .n-layout-sider,
+html.dark .n-layout-header,
+html.dark .n-layout-footer {
+  background-color: var(--app-bg-elevated) !important;
+}
