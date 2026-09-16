@@ -10,6 +10,12 @@ import sys
 import shutil
 from pathlib import Path
 
+# 无论从哪启动，都固定到本文件所在目录（禁止依赖调用方 cwd / 写死路径）
+_APP_ROOT = Path(__file__).resolve().parent
+os.chdir(_APP_ROOT)
+if str(_APP_ROOT) not in sys.path:
+    sys.path.insert(0, str(_APP_ROOT))
+
 # 设置标准输出编码为UTF-8（Windows兼容）
 def _setup_console_encoding():
     """设置控制台编码为UTF-8，避免Windows GBK编码问题"""
@@ -58,6 +64,9 @@ _OK = '[OK]'
 _WARN = '[WARN]'
 _ERROR = '[ERROR]'
 _INFO = '[INFO]'
+
+# 桌面客户端模式（由 Electron 传入），跳过前端构建 / Playwright 检查
+_DESKTOP_MODE = os.environ.get('XIANYU_DESKTOP') == '1'
 
 # ==================== 在导入任何模块之前先迁移数据库 ====================
 def _migrate_database_files_early():
@@ -145,6 +154,9 @@ except Exception as e:
 # ==================== 检查并安装Playwright浏览器 ====================
 def _check_and_install_playwright():
     """检查Playwright浏览器是否存在，如果不存在则自动安装"""
+    if _DESKTOP_MODE:
+        print(f"{_INFO} 桌面客户端模式，跳过 Playwright 检查")
+        return False
     print("检查Playwright浏览器...")
     
     # 检查是否安装了playwright模块
@@ -422,6 +434,9 @@ except Exception as e:
 # ==================== 自动构建前端 ====================
 def _build_frontend():
     """自动安装依赖并构建前端"""
+    if _DESKTOP_MODE:
+        print(f"{_OK} 桌面客户端模式，跳过前端构建")
+        return True
     xy_dir = Path("xy")
     frontend_dir = Path("frontend")
     static_dir = Path("static")
@@ -637,6 +652,15 @@ def load_keywords_file(path: str):
 
 async def main():
     print("开始启动主程序...")
+
+    # 桌面客户端：启动时强制保证 admin/admin123 可用（避免扫码前会话失败）
+    if _DESKTOP_MODE:
+        try:
+            from ensure_admin import ensure_admin
+            ensure_admin()
+            print(f"{_OK} 桌面模式管理员已就绪")
+        except Exception as e:
+            print(f"{_WARN} 桌面模式初始化管理员失败: {e}")
 
     # 初始化文件日志收集器
     print("初始化文件日志收集器...")

@@ -825,7 +825,10 @@ _empty_del/
 # 桌面端构建产物
 desktop-client/out/
 desktop-client/dist/
+desktop-client/dist-out/
+desktop-client/dist-old-*/
 desktop-client/release/
+desktop-client/bundled-runtime/
 desktop-client/*.exe
 
 # 本地打包/可执行文件（勿上传）
@@ -837,6 +840,7 @@ desktop-client/*.exe
 _diag_*.json
 _tmp_*.json
 _tmp_*.txt
+_qr_test.json
 
 # 允许前端锁文件（便于复现安装）
 !pnpm-lock.yaml

@@ -1,4 +1,13 @@
 """幂等初始化默认管理员：admin / admin123"""
+import os
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent
+os.chdir(_ROOT)
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 from db_manager import db_manager
 
 USERNAME = 'admin'
@@ -14,7 +23,6 @@ def ensure_admin() -> None:
             raise SystemExit('创建 admin 失败')
         print('已创建管理员: admin / admin123')
     else:
-        # 保证有可用密码与管理员权限
         db_manager.update_user_password(USERNAME, PASSWORD)
         print('已确保管理员可用: admin / admin123')
 

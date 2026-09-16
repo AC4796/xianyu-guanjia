@@ -18,6 +18,9 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "electron-vite build && electron-builder --win",
     "build:win:dir": "electron-vite build && electron-builder --win --dir",
+    "prepare:runtime": "node scripts/prepare-bundled-runtime.mjs",
+    "pack:release": "node scripts/pack-release.mjs",
+    "build:release": "npm run prepare:runtime && npm run build:win:dir && npm run pack:release",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux"
   },

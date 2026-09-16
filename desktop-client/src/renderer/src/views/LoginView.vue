@@ -70,16 +70,53 @@ function clearTimers(): void {
   }
 }
 
+async function waitBackendReady(): Promise<boolean> {
+  const ensure = window.api?.ensureBackend
+  if (typeof ensure !== 'function') return true
+
+  // 轮询状态文案，避免只卡在一句「启动中」
+  let stopped = false
+  const poll = window.setInterval(() => {
+    void window.api?.getBackendStatus?.().then((st) => {
+      if (!stopped && st?.message) statusText.value = st.message
+    })
+  }, 800)
+
+  try {
+    statusText.value = '正在准备本地服务…'
+    const st = await ensure()
+    if (st.ready) return true
+    statusText.value = st.message || '本地服务未就绪'
+    message.error(st.message || '本地服务未就绪', { duration: 6000 })
+    return false
+  } finally {
+    stopped = true
+    window.clearInterval(poll)
+  }
+}
+
 async function ensureAdminSession(): Promise<boolean> {
   if (sessionReady.value && auth.authenticated) return true
+  const backendOk = await waitBackendReady()
+  if (!backendOk) return false
   await auth.refresh()
   if (auth.authenticated) {
     sessionReady.value = true
     return true
   }
-  const res = await apiLogin({ username: 'admin', password: 'admin123' })
+
+  let res = await apiLogin({ username: 'admin', password: 'admin123' })
+  if (!res.success && typeof window.api?.resetAdmin === 'function') {
+    statusText.value = '正在修复本地账号…'
+    await window.api.resetAdmin()
+    await new Promise((r) => setTimeout(r, 600))
+    res = await apiLogin({ username: 'admin', password: 'admin123' })
+  }
   if (!res.success) {
-    message.error(res.message || '初始化会话失败，请确认后端已启动')
+    // 不对用户展示「用户名或密码错误」——那是内部会话账号，不是闲鱼账号
+    const tip = '本地会话初始化失败，请点击「刷新二维码」重试'
+    statusText.value = tip
+    message.error(tip, { duration: 5000 })
     return false
   }
   await auth.refresh()
@@ -90,8 +127,11 @@ async function ensureAdminSession(): Promise<boolean> {
 async function loadAccounts(): Promise<void> {
   loadingAccounts.value = true
   try {
-    const ok = await ensureAdminSession()
-    if (!ok) return
+    // 调用方已保证会话；这里只拉账号，避免重复登录报错
+    if (!sessionReady.value) {
+      const ok = await ensureAdminSession()
+      if (!ok) return
+    }
     accounts.value = await getAccountDetails()
     for (const a of accounts.value.slice(0, 6)) {
       if (!a.nickname || !a.avatar_url || a.avatar_url.includes('dicebear')) {
@@ -238,10 +278,21 @@ onMounted(async () => {
   await setWindowMode('login')
   updateSiderWidth()
   window.addEventListener('resize', updateSiderWidth)
+
+  step.value = 'qr'
+  statusText.value = '正在准备…'
+
+  const ok = await ensureAdminSession()
+  if (!ok) return
+
   await loadAccounts()
+  if (!sessionReady.value) {
+    statusText.value = statusText.value || '会话未就绪'
+    return
+  }
+
   const forceAccountList =
     String(route.query.switch || '') === '1' || localStorage.getItem('xy_auto_workbench') === '0'
-  // 主动「切换账号」时必须停在账号列表，禁止自动进工作台（否则窗口缩小后仍像卡住）
   if (!forceAccountList && accounts.value.length) {
     enterWorkbench(
       accounts.value.find((a) => a.id === accountStore.activeCookieId) || accounts.value[0]
@@ -335,7 +386,7 @@ onBeforeUnmount(() => {
               object-fit="contain"
               preview-disabled
             />
-            <n-empty v-else :show-icon="false" description="正在生成二维码…" />
+            <n-empty v-else :show-icon="false" :description="statusText || '正在生成二维码…'" />
             <n-text v-if="qrUrl">{{ statusText }}</n-text>
             <n-text v-if="qrUrl" style="color: #ff0000">{{ remainSeconds }}s</n-text>
             <n-space>

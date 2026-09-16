@@ -1,82 +1,218 @@
 import { app, shell, BrowserWindow, ipcMain, screen, dialog, net } from 'electron'
-import { join, dirname } from 'path'
-import { writeFile, access } from 'fs/promises'
-import { constants as fsConstants } from 'fs'
-import { spawn, type ChildProcess } from 'child_process'
+import { join, extname } from 'path'
+import { writeFile } from 'fs/promises'
+import { createReadStream, existsSync, statSync } from 'fs'
+import http from 'http'
+import type { IncomingMessage, ServerResponse } from 'http'
+import type { AddressInfo } from 'net'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import nodeNet from 'net'
+import {
+  BACKEND_HOST,
+  BACKEND_PORT,
+  ensureBackend,
+  getBackendStatus,
+  killBackend,
+  resetAdminPassword
+} from './backendBootstrap'
 
-let backendProcess: ChildProcess | null = null
 let mainWindow: BrowserWindow | null = null
+let gatewayServer: http.Server | null = null
+let gatewayPort = 0
 
-function isPortOpen(port: number, host = '127.0.0.1'): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = nodeNet.connect({ port, host })
-    socket.once('connect', () => {
-      socket.end()
-      resolve(true)
-    })
-    socket.once('error', () => resolve(false))
+/** 需要反代到 FastAPI 的路径前缀（与 electron.vite.config 代理保持一致） */
+const API_PREFIXES = [
+  '/login',
+  '/logout',
+  '/verify',
+  '/generate-captcha',
+  '/verify-captcha',
+  '/system-settings',
+  '/automation-settings',
+  '/ai-reply-settings',
+  '/ai-reply-test',
+  '/cookies',
+  '/cookie',
+  '/api',
+  '/keywords',
+  '/keywords-with-item-id',
+  '/keywords-with-type',
+  '/keywords-export',
+  '/keywords-import',
+  '/items',
+  '/cards',
+  '/orders',
+  '/item-replies',
+  '/item-reply',
+  '/itemReplays',
+  '/upload-image',
+  '/static',
+  '/chat',
+  '/admin',
+  '/message-notifications',
+  '/notification-channels',
+  '/delivery-rules',
+  '/default-reply',
+  '/default-replies',
+  '/user-settings',
+  '/analytics',
+  '/qr-login',
+  '/password-login',
+  '/backup',
+  '/change-password',
+  '/change-admin-password',
+  '/ws',
+  '/seller-watch',
+  '/dropship-jobs',
+  '/yanghao',
+  '/sensitive',
+  '/health',
+  '/xianyu'
+]
+
+const MIME: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.map': 'application/json'
+}
+
+function shouldProxyApi(pathname: string): boolean {
+  return API_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))
+}
+
+function proxyHttpToBackend(req: IncomingMessage, res: ServerResponse): void {
+  const headers = { ...req.headers, host: `${BACKEND_HOST}:${BACKEND_PORT}` }
+  const opts: http.RequestOptions = {
+    hostname: BACKEND_HOST,
+    port: BACKEND_PORT,
+    path: req.url,
+    method: req.method,
+    headers
+  }
+  const upstream = http.request(opts, (upRes) => {
+    res.writeHead(upRes.statusCode || 502, upRes.headers)
+    upRes.pipe(res)
+  })
+  upstream.on('error', (err) => {
+    console.error('[gateway] proxy error', err.message)
+    const st = getBackendStatus()
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' })
+    }
+    res.end(
+      JSON.stringify({
+        success: false,
+        message: st.starting
+          ? '本地服务启动中，请稍候再刷新'
+          : st.message || '后端未启动或不可达(8080)'
+      })
+    )
+  })
+  req.pipe(upstream)
+}
+
+function proxyWsToBackend(req: IncomingMessage, socket: any, head: Buffer): void {
+  const upstream = nodeNet.connect(BACKEND_PORT, BACKEND_HOST, () => {
+    const lines = [
+      `${req.method} ${req.url} HTTP/${req.httpVersion}`,
+      ...Object.entries(req.headers).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`),
+      '',
+      ''
+    ]
+    upstream.write(lines.join('\r\n'))
+    if (head && head.length) upstream.write(head)
+    socket.pipe(upstream)
+    upstream.pipe(socket)
+  })
+  upstream.on('error', () => {
+    try {
+      socket.destroy()
+    } catch {
+      /* ignore */
+    }
+  })
+  socket.on('error', () => {
+    try {
+      upstream.destroy()
+    } catch {
+      /* ignore */
+    }
   })
 }
 
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await access(p, fsConstants.F_OK)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/** 开发态：desktop-client/out/main → 项目根；安装包：探测常见路径 / 环境变量 */
-async function resolveProjectRoot(): Promise<string> {
-  const candidates = [
-    process.env.XIANYU_PROJECT_ROOT || '',
-    join(__dirname, '../../..'),
-    join(process.resourcesPath || '', 'project'),
-    join(dirname(process.execPath), 'project'),
-    join(dirname(process.execPath), '..', 'project'),
-    // 本机 phpstudy 常见路径
-    'D:\\phpstudy_pro\\WWW\\闲鱼管家',
-    'd:\\phpstudy_pro\\WWW\\闲鱼管家'
-  ].filter(Boolean)
-  for (const root of candidates) {
-    if (await pathExists(join(root, 'Start.py'))) return root
-  }
-  return candidates[1] || candidates[0]
-}
-
-async function ensureBackend(): Promise<void> {
-  if (await isPortOpen(8080)) {
-    console.log('[backend] 8080 already running')
+async function serveRendererFile(pathname: string, res: ServerResponse): Promise<void> {
+  const root = join(__dirname, '../renderer')
+  let rel = decodeURIComponent(pathname.split('?')[0] || '/')
+  if (rel === '/' || rel === '') rel = '/index.html'
+  // 防止路径穿越
+  const filePath = join(root, rel.replace(/^\/+/, ''))
+  if (!filePath.startsWith(root)) {
+    res.writeHead(403)
+    res.end('Forbidden')
     return
   }
-  const projectRoot = await resolveProjectRoot()
-  const startPy = join(projectRoot, 'Start.py')
-  if (!(await pathExists(startPy))) {
-    console.warn('[backend] Start.py not found, skip auto start. root=', projectRoot)
+  let target = filePath
+  if (!existsSync(target) || (existsSync(target) && statSync(target).isDirectory())) {
+    // SPA fallback
+    target = join(root, 'index.html')
+  }
+  if (!existsSync(target)) {
+    res.writeHead(404)
+    res.end('Not Found')
     return
   }
-  console.log('[backend] starting', startPy)
-  backendProcess = spawn('python', [startPy], {
-    cwd: projectRoot,
-    windowsHide: true,
-    stdio: 'ignore'
-  })
-  backendProcess.on('exit', (code) => {
-    console.log('[backend] exited', code)
-    backendProcess = null
-  })
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 1000))
-    if (await isPortOpen(8080)) {
-      console.log('[backend] ready')
+  const ext = extname(target).toLowerCase()
+  res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' })
+  createReadStream(target).pipe(res)
+}
+
+/**
+ * 打包后不走 file://（Cookie SameSite 跨源会丢会话），
+ * 改为本机同源 HTTP 网关：页面 + /qr-login 等 API 同属 127.0.0.1:port
+ */
+function startDesktopGateway(): Promise<number> {
+  if (gatewayServer && gatewayPort) return Promise.resolve(gatewayPort)
+
+  const server = http.createServer((req, res) => {
+    const pathname = (req.url || '/').split('?')[0] || '/'
+    if (shouldProxyApi(pathname)) {
+      proxyHttpToBackend(req, res)
       return
     }
-  }
-  console.warn('[backend] not ready after waiting')
+    void serveRendererFile(pathname, res)
+  })
+
+  server.on('upgrade', (req, socket, head) => {
+    const pathname = (req.url || '/').split('?')[0] || '/'
+    if (pathname.startsWith('/ws') || shouldProxyApi(pathname)) {
+      proxyWsToBackend(req, socket, head)
+      return
+    }
+    socket.destroy()
+  })
+
+  gatewayServer = server
+  return new Promise((resolve, reject) => {
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as AddressInfo
+      gatewayPort = addr.port
+      console.log('[gateway] listening http://127.0.0.1:' + gatewayPort)
+      resolve(gatewayPort)
+    })
+    server.on('error', reject)
+  })
 }
 
 type WindowMode = 'login' | 'workbench'
@@ -116,7 +252,7 @@ function applyWindowMode(win: BrowserWindow, mode: WindowMode): void {
   win.center()
 }
 
-function createWindow(): void {
+async function createWindow(): Promise<void> {
   const size = calcWindowSize('login')
   mainWindow = new BrowserWindow({
     width: size.width,
@@ -152,7 +288,8 @@ function createWindow(): void {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    const port = await startDesktopGateway()
+    mainWindow.loadURL(`http://127.0.0.1:${port}/`)
   }
 }
 
@@ -164,6 +301,9 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('app:getVersion', () => app.getVersion())
+  ipcMain.handle('app:getBackendStatus', () => getBackendStatus())
+  ipcMain.handle('app:ensureBackend', async () => ensureBackend())
+  ipcMain.handle('app:resetAdmin', async () => resetAdminPassword())
   ipcMain.handle('app:getOpenAtLogin', () => {
     try {
       const s = app.getLoginItemSettings()
@@ -178,7 +318,6 @@ app.whenReady().then(async () => {
       if (app.isPackaged) {
         app.setLoginItemSettings({ openAtLogin, openAsHidden: false })
       } else {
-        // 开发态：登记当前 Electron + 项目入口，便于本机验证开关是否生效
         app.setLoginItemSettings({
           openAtLogin,
           openAsHidden: false,
@@ -208,7 +347,6 @@ app.whenReady().then(async () => {
       })
       if (result.canceled || !result.filePath) return { ok: false }
       const target = result.filePath
-      // data URL
       if (String(url).startsWith('data:')) {
         const m = String(url).match(/^data:[^;]+;base64,(.+)$/)
         if (!m) return { ok: false }
@@ -225,11 +363,12 @@ app.whenReady().then(async () => {
     }
   })
 
-  await ensureBackend()
-  createWindow()
+  // 先开窗口，后端自举在界面里显示进度（避免装依赖时黑屏假死）
+  void ensureBackend()
+  await createWindow()
 
   app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) void createWindow()
   })
 })
 
@@ -240,11 +379,13 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  if (backendProcess && !backendProcess.killed) {
+  if (gatewayServer) {
     try {
-      backendProcess.kill()
+      gatewayServer.close()
     } catch {
       /* ignore */
     }
+    gatewayServer = null
   }
+  killBackend()
 })

@@ -1,6 +1,49 @@
+﻿# Bundle backend + portable Python so recipients need no extra installs
+extraResources:
+  - from: ..
+    to: project
+    filter:
+      - '**/*'
+      - '!desktop-client{,/**}'
+      - '!frontend{,/**}'
+      - '!frontend_*{,/**}'
+      - '!frontend-semi{,/**}'
+      - '!static_backup*{,/**}'
+      - '!data{,/**}'
+      - '!logs{,/**}'
+      - '!backups{,/**}'
+      - '!trajectory_history{,/**}'
+      - '!__pycache__{,/**}'
+      - '!**/*.db'
+      - '!**/*.db-*'
+      - '!**/.git{,/**}'
+      - '!**/.venv{,/**}'
+      - '!**/venv{,/**}'
+      - '!**/node_modules{,/**}'
+      - '!**/.cursor{,/**}'
+      - '!**/dist{,/**}'
+      - '!**/dist-out{,/**}'
+      # 误打进的压缩包/安装包是体积暴涨主因（曾到 1.7GB+）
+      - '!**/*.zip'
+      - '!**/*.7z'
+      - '!**/*.rar'
+      - '!**/*.msi'
+      - '!**/*.iso'
+      - '!**/*.exe'
+      - '!**/*.log'
+      - '!nginx{,/**}'
+      - '!docker-compose*.yml'
+      - '!Dockerfile*'
+      - '!_tmp_*'
+      - '!_diag_*'
+      - '!_empty_del{,/**}'
+  - from: bundled-runtime/python
+    to: python
+
 appId: com.xianyuguanjia.desktop
 productName: 闲鱼管家
 directories:
+  output: dist-out
   buildResources: build
 files:
   - '!**/.vscode/*'
@@ -9,6 +52,8 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!scripts/*'
+  - '!bundled-runtime/*'
 asarUnpack:
   - resources/**
 win:

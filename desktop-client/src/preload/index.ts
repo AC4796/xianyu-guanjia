@@ -1,8 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+export type BackendStatus = {
+  ready: boolean
+  starting: boolean
+  message: string
+  projectRoot: string
+  python: string
+}
+
 const api = {
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+  getBackendStatus: (): Promise<BackendStatus> => ipcRenderer.invoke('app:getBackendStatus'),
+  ensureBackend: (): Promise<BackendStatus> => ipcRenderer.invoke('app:ensureBackend'),
+  resetAdmin: (): Promise<{ ok: boolean; message: string }> => ipcRenderer.invoke('app:resetAdmin'),
   getOpenAtLogin: (): Promise<{ openAtLogin: boolean; openAsHidden?: boolean }> =>
     ipcRenderer.invoke('app:getOpenAtLogin'),
   setOpenAtLogin: (

@@ -1,7 +1,6 @@
-/** API 根地址：开发走 Vite 代理；打包 EXE 直连本地后端 */
+/** API 根地址：开发走 Vite 代理；打包后走 Electron 同源网关（相对路径，Cookie 可带上） */
 export function apiBase(): string {
-  if (import.meta.env.DEV) return ''
-  return 'http://127.0.0.1:8080'
+  return ''
 }
 
 export class ApiError extends Error {

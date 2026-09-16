@@ -1,247 +1,170 @@
-# 🐟 闲鱼超级管家
+# 闲鱼管家
 
 <div align="center">
 
-**现代化的闲鱼自动回复与管理平台 - 商务专业风格 UI**
+**闲鱼多账号自动回复 · 订单发货 · 桌面客户端一键使用**
 
-[![GitHub](https://img.shields.io/badge/GitHub-23Star%2Fxianyu--super--butler-blue?logo=github)](https://github.com/23Star/xianyu-super-butler)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
-[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
-
-基于 [zhinianboke/xianyu-auto-reply](https://github.com/zhinianboke/xianyu-auto-reply) 二次开发 · 全新 UI · 持续更新
+[![Electron](https://img.shields.io/badge/Electron-Desktop-47848F.svg)](https://www.electronjs.org/)
+[![Vue](https://img.shields.io/badge/Vue-3-42b883.svg)](https://vuejs.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688.svg)](https://fastapi.tiangolo.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 </div>
 
 ---
 
-## 📸 界面预览
+## 简介
 
-### 工作台 Dashboard
+**闲鱼管家**是一套面向闲鱼卖家的自动化经营管理工具，支持：
 
-![Dashboard 界面](static/uploads/images/1.png)
+- **桌面客户端**：Windows 解压即用，自动拉起本地服务，扫码绑定账号
+- **Web 管理端**：浏览器访问本地服务，进行回复规则、订单、发货等配置
+- **多账号隔离**：每个闲鱼号独立 Cookie 会话，互不串号
 
-### 订单管理 Orders
+适合需要多店管理、自动客服回复、自动发货的卖家与工作室。
 
-![订单管理](static/uploads/images/2.png)
-
-### 补发功能 - 立即发货
-
-![补发功能-发货方式选择](static/uploads/images/3.png) ![补发功能-发货中](static/uploads/images/4.png)
+> 后端能力参考并二次开发自开源项目 [xianyu-auto-reply](https://github.com/zhinianboke/xianyu-auto-reply)；本仓库在此基础上完善了 **Electron 桌面端**、开机自启、打包分发与一键启动体验。
 
 ---
 
-## 📖 简介
+## 功能一览
 
-闲鱼超级管家是在 [xianyu-auto-reply](https://github.com/zhinianboke/xianyu-auto-reply) 基础上的二次开发版本，采用商务专业风格的全新 UI 设计，让闲鱼店铺管理更加高效便捷。
-
----
-
-## ⭐ 核心功能
-
-### 智能回复
-- 🤖 关键词匹配回复
-- 🧠 AI 智能议价（支持自定义折扣规则）
-- 📝 默认回复配置
-- 🛍️ 商品专属回复
-
-### 自动发货
-- 🚚 支持多规格商品
-- ⏰ 延时发货设置
-- 🎫 卡券管理
-- 📋 发货规则配置
-
-### 订单管理
-- 📦 订单列表查看
-- 🔄 批量刷新（并发处理）
-- 🔍 订单详情查看
-- 📮 收货人信息管理
-- ✅ 订单状态更新
-
-### 账号管理
-- 📱 多账号支持
-- 🔐 扫码/密码登录
-- 🍪 Cookie 手动输入
-- ⚡ 账号启用/禁用
-- 🤖 AI 议价配置
-
-### 其他功能
-- 📊 数据统计与趋势分析
-- 📄 Excel 批量导入导出
-- 🔍 商品搜索
-- 👥 多用户权限管理
-- ✨ 基本解决滑块验证失败问题，成功率 99%
+| 模块 | 能力 |
+|------|------|
+| 账号 | 扫码登录 / 多账号切换 / Cookie 持久化 / 重新授权 |
+| 智能回复 | 关键词回复、默认回复、商品专属回复、AI 议价 |
+| 自动发货 | 卡券发货、延时发货、多规格、发货规则 |
+| 订单 | 订单列表、状态刷新、收货信息、批量处理 |
+| 商品 | 商品管理、采集、上架相关能力 |
+| 通知 | 消息通知渠道配置 |
+| 桌面端 | 扫码窗口、工作台、开机启动、内置运行环境打包 |
 
 ---
 
-## 🚀 使用方法
+## 两种使用方式
 
-### 快速启动
+### 方式 A：桌面成品（推荐发给别人 / 自己日常用）
+
+1. 下载 Release 中的 Windows 发布包（或使用本地打包目录 `desktop-client/dist-out/闲鱼管家-发给别人`）
+2. **整包解压**，不要只拷贝单个 exe
+3. 双击 `闲鱼管家\XianyuGuanjia.exe`
+4. 等待本地服务自动启动后，用闲鱼 App **扫码登录**
+
+说明：正式发布包装有内置 Python 运行环境，对方电脑一般**无需再安装 Python**。
+
+### 方式 B：源码开发 / 自建服务
+
+#### 环境要求
+
+- Windows 10/11（桌面端）
+- Python 3.11+
+- Node.js 18+ / pnpm（改前端或桌面端时需要）
+
+#### 1. 克隆仓库
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/Mxucc/xianyu-super-butler.git
-cd xianyu-super-butler
+git clone https://github.com/shudaxiag/xianyu-guanjia.git
+cd xianyu-guanjia
+```
 
-# 2. 安装依赖
+> 若你的仓库名不同，请把上面地址换成你自己的仓库地址。
+
+#### 2. 安装后端依赖
+
+```bash
 pip install -r requirements.txt
-
-# 3. 构建前端（改成 pnpm 了）
-cd frontend
-pnpm install
-pnpm run build
-
-# 4. 启动服务（返回项目根目录）
-cd ..
-python Start.py
-
-# 5. 访问应用
-# 浏览器打开 http://localhost:8080
+# 或仅桌面启动所需精简依赖：
+# pip install -r requirements-desktop.txt
 ```
 
-### 🔐 默认登录信息
-
-```
-这个没有了，按网页提示操作
-```
-
-⚠️ **安全提示：首次登录后请立即修改默认密码！**
-
-**说明：**
-- `npm run build` 会将前端打包到 `static/` 目录
-- `Start.py` 启动后端服务（端口 8080），同时提供前端静态文件
-- 前端已构建，无需单独运行前端开发服务器
-
-### 前端开发模式
-
-如需修改前端代码（支持热更新）：
+#### 3. 启动后端
 
 ```bash
-# 终端1：启动后端
 python Start.py
-
-# 终端2：启动前端开发服务器
-cd frontend
-npm run dev
-
-# 访问 http://localhost:3000
 ```
 
-### 首次使用
+浏览器访问：http://127.0.0.1:8080  
+默认管理员：`admin` / `admin123`（请及时修改）
 
-1. **注册账号** - 访问 http://localhost:8080/register 创建管理员账号
-2. **添加闲鱼账号** - 支持扫码登录、密码登录、手动输入Cookie
-3. **配置关键词** - 为每个账号配置自动回复关键词和AI智能议价
-4. **开始使用** - 系统会自动监听闲鱼消息并自动回复、自动发货
+#### 4.（可选）启动桌面客户端开发模式
 
----
+```bash
+cd desktop-client
+pnpm install
+pnpm dev
+```
 
-## 🏗️ 技术栈
+#### 5.（可选）打包 Windows 客户端
 
-**后端：** FastAPI · Python 3.11+ · SQLite · Playwright · WebSocket · Asyncio
-
-**前端：** React 18 · TypeScript · Vite · Tailwind CSS · Framer Motion · Zustand
-
-**性能优化：** 浏览器实例池 · 并发处理 · 智能缓存
-
----
-
-## 🔄 更新日志
-
-### ✨ 新增：订单列表单条订单操作 (2026-02-20)
-- **单条订单同步** - 点击同步按钮可单独刷新该订单最新状态
-- **单条订单删除** - 支持删除单条订单，带确认对话框
-- **表格布局优化** - 固定列宽布局，各列宽度分配更合理
-
-<details><summary>📁 查看历史更新</summary>
-
-### 🐛 修复：订单刷新与筛选功能 (2026-02-13)
-- **修复批量订单刷新未使用Playwright实时获取** - 添加 `force_refresh=True` 参数，确保点击"一键同步订单"时使用浏览器获取最新状态
-- **修复DOM状态检测JavaScript语法错误** - 修正 while 循环条件括号位置，确保状态正确解析
-- **补充缺失的状态码映射** - 添加状态码11（交易完成）和12（交易关闭）的映射
-- **优化订单刷新筛选逻辑** - 简化为仅根据状态判断，稳定状态（shipped/completed/cancelled）的订单不再刷新
-- **调整前端筛选选项** - 订单中心筛选改为"全部、已发货、待发货、已取消、其他"，新增"已取消"选项
-- **修复后端筛选字段名不匹配** - 修正 `order_status` 为 `status`，确保筛选功能正常工作
-- **简化日志输出** - 移除冗余的print语句
-
-### ✨ 新增：补发功能 - 立即发货按钮 (2026-02-08)
-- **核心功能**：点击"立即发货"后弹出自定义对话框，提供两种发货方式
-  - **仅修改闲鱼发货状态**：只调用闲鱼API标记已发货，不发卡券（适用于已给客户发过货，只是忘了改状态）
-  - **完整发货（匹配卡券并发送）**：匹配发货规则 → 获取卡券 → 发送给买家 → 标记已发货（适用于订单既没发卡券也没改状态）
-- **Bug 修复**：
-  - 修复 `aiohttp` Timeout 错误 - 不再复用运行实例的 session，改为创建独立的 `aiohttp.ClientSession`，避免跨异步上下文问题
-  - 修复找不到买家 `chat_id` - orders 表新增 `chat_id` 字段，自动发货时自动存储；手动发货优先从订单取，找不到再查 `ai_conversations` 表
-  - `frontend/` 重命名为 `frontend_backup/` - 当前使用的前端目录为 `xy/`
-  - `vite build` 不再删除 `xianyu_js_version_2.js` - 改为 `emptyOutDir: false`，构建时保留 static 目录中的非构建文件
-- **改动文件**：
-  - `reply_server.py` - 重写 `/api/orders/manual-ship` 端点
-  - `db_manager.py` - 新增 `chat_id` 字段、`find_chat_id_by_buyer` 方法
-  - `XianyuAutoAsync.py` - 发货/标记订单时存储 chat_id
-  - `xy/components/OrderList.tsx` - 新增发货方式选择对话框
-  - `xy/services/api.ts` - 更新 API 类型
-  - `xy/vite.config.ts` - `emptyOutDir: false`
-
-### 🐛 修复前端加载路径问题 (2026-01-19)
-- 修复 Vite 构建资源路径错误导致的白屏问题
-- 修改 `frontend/vite.config.ts` 配置
-
-### 🎨 前端UI全面重构 - 商务专业风格 (2026-01-18)
-- **UI组件库重构** - Button、Card、Badge、Input、Textarea 等基础组件
-- **Dashboard 2.0** - 数据统计卡片、快捷操作面板、活动流、账号概览表格
-- **Orders 2.0** - 侧边详情面板设计、搜索筛选、内联编辑、批量刷新
-- **Accounts 2.0** - 卡片网格布局、AI议价状态可视化、快速切换
-- **配色系统** - 品牌黄 #f59e0b + 商务灰度系列
-
-### ⚡ 性能优化 - 减少浏览器启动次数 (2026-01-17)
-- **浏览器实例池** - 按账号复用浏览器实例，最多3个实例自动管理
-- **合并函数优化** - 一次访问获取所有订单数据，启动次数减少50%
-- **并发批量处理** - 支持5个订单并发处理，处理速度提升5倍
-
-### 订单数据刷新功能优化 (2026-01-16)
-- 智能订单刷新自动获取完整收货人信息
-- 修正订单状态映射逻辑（退款成功、系统关闭）
-- 数据完整性检查优化
-
-</details>
+```bash
+cd desktop-client
+pnpm run prepare:runtime   # 首次：下载并预置便携 Python + 依赖
+pnpm run build:release     # 生成 dist-out/闲鱼管家-发给别人
+```
 
 ---
 
-## 🤝 贡献指南
+## 目录结构
 
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
-
----
-
-## 📄 开源协议
-
-[MIT License](https://opensource.org/licenses/MIT)
-
-> ⚠️ **免责声明**
->
-> 本项目仅供学习研究使用，严禁用于商业用途！
->
-> 使用本项目时请遵守相关法律法规，因使用本项目而产生的一切后果由使用者自行承担。
+```text
+闲鱼管家/
+├── Start.py                 # 后端启动入口
+├── reply_server.py          # FastAPI 主服务
+├── ensure_admin.py          # 初始化管理员
+├── requirements.txt         # 完整 Python 依赖
+├── requirements-desktop.txt # 桌面端精简依赖
+├── desktop-client/          # Electron + Vue 桌面客户端
+│   ├── src/main/            # 主进程（自动拉起后端、本地网关）
+│   ├── src/renderer/        # 界面
+│   └── scripts/             # 打包 / 发布脚本
+├── frontend/                # Web 前端源码（可选构建）
+├── utils/                   # 工具与协议相关
+└── static/                  # 静态资源
+```
 
 ---
 
-## 📊 Star History
+## 常见问题
 
-[![Star History Chart](https://api.star-history.com/svg?repos=23Star/xianyu-super-butler&type=Date)](https://star-history.com/#23Star/xianyu-super-butler&Date)
+**Q: 打开客户端提示后端不可达？**  
+A: 请使用完整发布包（含 `resources/project` 与 `resources/python`），不要只发单个 exe。
+
+**Q: 提示用户名或密码错误？**  
+A: 这是内部管理会话，不是闲鱼账号。请使用最新桌面包；客户端会自动初始化 `admin`。
+
+**Q: 可以把 1GB 成品直接提交进 Git 吗？**  
+A: 不建议。源码走 GitHub 仓库；成品用 **GitHub Releases** 上传压缩包。
+
+**Q: 多账号会不会串 Cookie？**  
+A: 按账号隔离存储；仍建议固定网络环境，避免频繁异地切换触发平台风控。
 
 ---
 
-<div align="center">
+## 截图
 
-**如果对您有帮助，请给个 Star ⭐**
+可将工作台、扫码登录、订单页截图放到 `docs/images/` 后在此引用：
 
-Made with ❤️ by [23Star](https://github.com/23Star)
+```markdown
+![工作台](docs/images/home.png)
+![扫码登录](docs/images/login.png)
+```
 
-基于 [xianyu-auto-reply](https://github.com/zhinianboke/xianyu-auto-reply) 开发
+---
 
-</div>
+## 免责声明
+
+本项目仅供学习与交流，请遵守闲鱼平台规则与当地法律法规。使用自动化能力造成的账号风险由使用者自行承担。
+
+---
+
+## 致谢
+
+- [zhinianboke/xianyu-auto-reply](https://github.com/zhinianboke/xianyu-auto-reply)
+- FastAPI / Vue / Electron / Naive UI 等开源生态
+
+---
+
+## License
+
+MIT
