@@ -118,7 +118,7 @@ pnpm run build:release
 
 **加入 QQ 交流群** — 获取更新、反馈问题、交流玩法
 
-[![QQ Group](https://img.shields.io/badge/QQ群-1106143585-12B7F5?logo=tencent-qq&logoColor=white)](#community)
+![QQ Group](https://img.shields.io/badge/QQ群-1106143585-12B7F5?logo=tencent-qq&logoColor=white)](#community)
 
 群号：`1106143585`
 
@@ -136,7 +136,7 @@ pnpm run build:release
 
 <div align="center">
 
-<img src="docs/assets/wechat-pay.png" alt="微信支付打赏" width="280" />
+img src="docs/assets/wechat-pay.png" alt="微信支付打赏" width="280" />
 
 <br/>
 
