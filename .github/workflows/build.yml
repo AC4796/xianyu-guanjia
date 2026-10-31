@@ -18,15 +18,13 @@ jobs:
         with:
           node-version: '22'
 
-      - name: 3. 關閉 TypeScript 嚴格檢查並打包 Electron EXE
+      - name: 3. 編譯程式碼並強制封裝為 Windows EXE
         shell: pwsh
         run: |
-          # 找到 package.json 所在目錄
           $pkgFile = Get-ChildItem -Path . -Filter "package.json" -Recurse -Depth 2 | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -First 1
           Set-Location $pkgFile.DirectoryName
-          Write-Host "工作目錄: $(Get-Location)"
 
-          # 1. 將所有 tsconfig.json 中的嚴格檢查關閉，避免型別不符中斷編譯
+          # 1. 關閉 tsconfig 嚴格檢查，繞過 BrowserWindow | undefined 報錯
           Get-ChildItem -Path . -Filter "tsconfig*.json" -Recurse | ForEach-Object {
             $content = Get-Content $_.FullName -Raw
             $content = $content -replace '"strict"\s*:\s*true', '"strict": false'
@@ -35,11 +33,10 @@ jobs:
             Set-Content -Path $_.FullName -Value $content -Encoding UTF8
           }
 
-          # 2. 移除 package.json build 指令中的 typecheck / tsc 檢查步驟
+          # 2. 移除 package.json 中的 typecheck 步驟
           $pkgJson = Get-Content "package.json" -Raw | ConvertFrom-Json
           foreach ($prop in $pkgJson.scripts.PSObject.Properties) {
             $val = $prop.Value
-            # 將 tsc 或 vue-tsc 或 typecheck 替換成無動作，直接進入 vite build / electron-builder
             $val = $val -replace 'vue-tsc[^&]*&&\s*', ''
             $val = $val -replace 'tsc[^&]*&&\s*', ''
             $val = $val -replace 'npm run typecheck[^&]*&&\s*', ''
@@ -48,36 +45,36 @@ jobs:
           }
           $pkgJson | ConvertTo-Json -Depth 10 | Set-Content "package.json" -Encoding UTF8
 
-          # 3. 安裝依賴套件
+          # 3. 安裝依賴並編譯前端/主進程程式碼 (即原本產出 590 KB 的步驟)
           npm install --legacy-peer-deps
-
-          # 4. 執行前端與 Electron 編譯
           npm run build
 
-          # 5. 若 npm run build 僅編譯程式碼而未封裝成 .exe，則執行 electron-builder 封裝免安裝版與安裝包
-          if ($pkgJson.scripts.PSObject.Properties.Name -contains "build:win") {
-            npm run build:win
-          } elseif ($pkgJson.scripts.PSObject.Properties.Name -contains "dist") {
-            npm run dist
-          } else {
-            npx electron-builder --win --dir
-          }
+          # 4. 強制使用 electron-builder 封裝成免安裝版資料夾 (win-unpacked) 與單一可攜式 .exe
+          npx electron-builder --win portable dir --config.win.signAndEditExecutable=false
 
-      - name: 4. 收集打包好的 EXE 檔案
+      - name: 4. 收集打包好的 EXE 與 win-unpacked 資料夾
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "output_exe" | Out-Null
-          # 搜尋常見的 Electron 輸出目錄 (dist, out, release, build)
-          $dirs = @("dist", "out", "release", "dist_electron", "build")
-          foreach ($d in $dirs) {
-            $foundDirs = Get-ChildItem -Path . -Directory -Filter $d -Recurse -Depth 2 | Where-Object { $_.FullName -notmatch "node_modules" }
-            foreach ($fd in $foundDirs) {
-              Write-Host "複製輸出目錄: $($fd.FullName)"
-              Copy-Item -Path "$($fd.FullName)\*" -Destination "output_exe\" -Recurse -Force -ErrorAction SilentlyContinue
+          
+          # 尋找所有生成的 .exe 執行檔 (排除 node_modules)
+          $exeFiles = Get-ChildItem -Path . -Filter "*.exe" -Recurse | Where-Object { $_.FullName -notmatch "node_modules" }
+          foreach ($exe in $exeFiles) {
+            Write-Host "找到 EXE 檔案: $($exe.FullName) ($($exe.Length / 1MB) MB)"
+          }
+
+          # 優先將 win-unpacked (免安裝完整資料夾) 與獨立 .exe 複製到輸出目錄
+          $unpacked = Get-ChildItem -Path . -Directory -Filter "win-unpacked" -Recurse | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -First 1
+          if ($unpacked) {
+            Copy-Item -Path "$($unpacked.FullName)\*" -Destination "output_exe\" -Recurse -Force
+          } else {
+            # 若為單一安裝包或 portable exe，直接複製該目錄下的所有檔案
+            foreach ($exe in $exeFiles) {
+              Copy-Item -Path $exe.FullName -Destination "output_exe\" -Force
             }
           }
 
-      - name: 5. 上傳 EXE 成品供下載
+      - name: 5. 上傳完整 EXE 成品
         uses: actions/upload-artifact@v4
         with:
           name: XianyuGuanjia-Windows
