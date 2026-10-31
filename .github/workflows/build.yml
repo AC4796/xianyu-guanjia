@@ -13,24 +13,68 @@ jobs:
       - name: 1. 檢出專案原始碼
         uses: actions/checkout@v4
 
-      - name: 2. 配置 Node.js 22 環境
+      - name: 2. 配置 Node.js 22 與 Python 3.11 環境
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.9'
 
-      - name: 3. 編譯程式碼並強制封裝為 Windows EXE
+      - name: 3. 準備內置 Python 運行環境 (Embeddable Python + 依賴套件)
+        shell: pwsh
+        run: |
+          Write-Host "正在下載官方 Windows 內嵌版 Python 3.11.9..."
+          Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip" -OutFile "py_embed.zip"
+          Expand-Archive -Path "py_embed.zip" -DestinationPath "builtin_python" -Force
+          Remove-Item "py_embed.zip"
+
+          # 開啟內嵌版 Python 的 site-packages 支援 (解除 import site 註解)
+          $pthFile = Get-ChildItem -Path "builtin_python" -Filter "*._pth" | Select-Object -First 1
+          if ($pthFile) {
+            $content = Get-Content $pthFile.FullName -Raw
+            $content = $content -replace '#import site', 'import site'
+            $content = $content + "`r`n..`r`n../backend`r`n"
+            Set-Content -Path $pthFile.FullName -Value $content -Encoding ASCII
+          }
+
+          # 為內嵌版 Python 安裝 pip 與專案依賴套件
+          Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile "get-pip.py"
+          .\builtin_python\python.exe get-pip.py --no-warn-script-location
+          
+          $reqs = Get-ChildItem -Path . -Filter "requirements.txt" -Recurse -Depth 3 | Where-Object { $_.FullName -notmatch "node_modules" }
+          foreach ($req in $reqs) {
+            Write-Host "安裝後端依賴至內置環境: $($req.FullName)"
+            .\builtin_python\python.exe -m pip install -r $req.FullName --no-warn-script-location
+          }
+
+          # 自動探測原始碼中檢查的「內置運行環境」資料夾名稱，並建立對應目錄
+          New-Item -ItemType Directory -Force -Path "extra_resources" | Out-Null
+          Copy-Item -Path "builtin_python" -Destination "extra_resources\python" -Recurse -Force
+          Copy-Item -Path "builtin_python" -Destination "extra_resources\env" -Recurse -Force
+          Copy-Item -Path "builtin_python" -Destination "extra_resources\runtime" -Recurse -Force
+
+          # 將專案內的後端 Python 檔案與設定檔一併複製進內置環境
+          Get-ChildItem -Path . -Exclude "node_modules","builtin_python","extra_resources",".git","dist","out","release" | ForEach-Object {
+            if ($_.Name -match "\.(py|yaml|yml|json|ini|env)$" -or $_.Name -in @("backend", "server", "python", "api", "core", "utils", "static", "templates")) {
+              Copy-Item -Path $_.FullName -Destination "extra_resources\" -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+      - name: 4. 編譯 Electron 前端並封裝 EXE
         shell: pwsh
         run: |
           $pkgFile = Get-ChildItem -Path . -Filter "package.json" -Recurse -Depth 2 | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -First 1
-          Set-Location $pkgFile.DirectoryName
+          $workDir = $pkgFile.DirectoryName
+          Set-Location $workDir
 
-          # 1. 關閉 tsconfig 嚴格檢查，繞過 BrowserWindow | undefined 報錯
+          # 1. 關閉 tsconfig 嚴格型別檢查
           Get-ChildItem -Path . -Filter "tsconfig*.json" -Recurse | ForEach-Object {
-            $content = Get-Content $_.FullName -Raw
-            $content = $content -replace '"strict"\s*:\s*true', '"strict": false'
-            $content = $content -replace '"strictNullChecks"\s*:\s*true', '"strictNullChecks": false'
-            $content = $content -replace '"noEmitOnError"\s*:\s*true', '"noEmitOnError": false'
-            Set-Content -Path $_.FullName -Value $content -Encoding UTF8
+            $c = Get-Content $_.FullName -Raw
+            $c = $c -replace '"strict"\s*:\s*true', '"strict": false'
+            $c = $c -replace '"strictNullChecks"\s*:\s*true', '"strictNullChecks": false'
+            $c = $c -replace '"noEmitOnError"\s*:\s*true', '"noEmitOnError": false'
+            Set-Content -Path $_.FullName -Value $c -Encoding UTF8
           }
 
           # 2. 移除 package.json 中的 typecheck 步驟
@@ -45,37 +89,29 @@ jobs:
           }
           $pkgJson | ConvertTo-Json -Depth 10 | Set-Content "package.json" -Encoding UTF8
 
-          # 3. 安裝依賴並編譯前端/主進程程式碼 (即原本產出 590 KB 的步驟)
+          # 3. 安裝前端依賴並編譯並封裝為免安裝資料夾 (win-unpacked)
           npm install --legacy-peer-deps
           npm run build
+          npx electron-builder --win dir --config.win.signAndEditExecutable=false
 
-          # 4. 強制使用 electron-builder 封裝成免安裝版資料夾 (win-unpacked) 與單一可攜式 .exe
-          npx electron-builder --win portable dir --config.win.signAndEditExecutable=false
-
-      - name: 4. 收集打包好的 EXE 與 win-unpacked 資料夾
+      - name: 5. 將內置運行環境注入 EXE 的 resources 目錄
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "output_exe" | Out-Null
-          
-          # 尋找所有生成的 .exe 執行檔 (排除 node_modules)
-          $exeFiles = Get-ChildItem -Path . -Filter "*.exe" -Recurse | Where-Object { $_.FullName -notmatch "node_modules" }
-          foreach ($exe in $exeFiles) {
-            Write-Host "找到 EXE 檔案: $($exe.FullName) ($($exe.Length / 1MB) MB)"
-          }
-
-          # 優先將 win-unpacked (免安裝完整資料夾) 與獨立 .exe 複製到輸出目錄
           $unpacked = Get-ChildItem -Path . -Directory -Filter "win-unpacked" -Recurse | Where-Object { $_.FullName -notmatch "node_modules" } | Select-Object -First 1
+          
           if ($unpacked) {
+            Write-Host "正在組合 EXE 與內置運行環境..."
             Copy-Item -Path "$($unpacked.FullName)\*" -Destination "output_exe\" -Recurse -Force
-          } else {
-            # 若為單一安裝包或 portable exe，直接複製該目錄下的所有檔案
-            foreach ($exe in $exeFiles) {
-              Copy-Item -Path $exe.FullName -Destination "output_exe\" -Force
-            }
+            
+            # 將準備好的內置環境同時放入 resources 與根目錄，確保所有相對路徑檢查都能通過
+            Copy-Item -Path "extra_resources\*" -Destination "output_exe\resources\" -Recurse -Force
+            Copy-Item -Path "extra_resources\python" -Destination "output_exe\python" -Recurse -Force
+            Copy-Item -Path "extra_resources\env" -Destination "output_exe\env" -Recurse -Force
           }
 
-      - name: 5. 上傳完整 EXE 成品
+      - name: 6. 上傳完整免安裝版成品
         uses: actions/upload-artifact@v4
         with:
-          name: XianyuGuanjia-Windows
+          name: XianyuGuanjia-Full-Portable
           path: output_exe
